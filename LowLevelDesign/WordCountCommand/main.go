@@ -22,6 +22,64 @@ func (c *Configuration) SetDefault() {
 func main() {
 	args := os.Args[1:]
 	config := &Configuration{}
+	filePath := setConfigurationAndGetFilePath(args, config)
+	f, _ := os.Open(filePath)
+	buffer := make([]byte, 100)
+	ans := make([]int, 0)
+	Bytes := 0
+	LC := 0
+	WC := 0
+	CC := 0
+	charEncountered := false
+	for true {
+		if n, _ := f.Read(buffer); n > 0 {
+			s := string(buffer)
+			Bytes += n
+
+			for i := 0; i < n; i += 1 {
+				switch s[i] {
+				case '\n':
+					LC += 1
+					if charEncountered {
+						WC += 1
+						charEncountered = false
+					}
+				case ' ':
+					if charEncountered {
+						WC += 1
+						charEncountered = false
+					}
+				default:
+					charEncountered = true
+					CC += 1
+				}
+			}
+		} else if n == 0 {
+			if charEncountered {
+				WC += 1
+			}
+			if config.LineCountNeeded {
+				ans = append(ans, LC)
+			}
+			if config.WordCountNeeded {
+				ans = append(ans, WC)
+			}
+			if config.ByteCountNeeded {
+				ans = append(ans, Bytes)
+			}
+			if config.CharCountNeeded {
+				ans = append(ans, CC)
+			}
+			break
+		}
+	}
+	for _, a := range ans {
+		fmt.Printf("\t%d", a)
+	}
+	fmt.Printf("\t%s", filePath)
+}
+
+func setConfigurationAndGetFilePath(args []string, config *Configuration) string {
 	filePath := ""
 	if strings.HasPrefix(args[0], "-") {
 		for _, c := range args[0][1:] {
@@ -52,56 +110,6 @@ func main() {
 		config.SetDefault()
 		filePath = args[0]
 	}
-
-	f, _ := os.Open(filePath)
-	buffer := make([]byte, 100)
-	ans := make([]int, 0)
-	Bytes := 0
-	LC := 0
-	WC := 0
-	CC := 0
-	for true {
-
-		if n, _ := f.Read(buffer); n > 0 {
-			s := string(buffer)
-			Bytes += n
-			charEncountered := false
-			for i := 0; i < len(s); i += 1 {
-				switch s[i] {
-				case '\n':
-					LC += 1
-					charEncountered = false
-				case ' ':
-					if charEncountered {
-						WC += 1
-					}
-					charEncountered = false
-				default:
-					charEncountered = true
-					CC += 1
-				}
-			}
-		} else if n == 0 {
-			if config.LineCountNeeded {
-				ans = append(ans, LC)
-			}
-			if config.WordCountNeeded {
-				ans = append(ans, WC)
-			}
-			if config.ByteCountNeeded {
-				ans = append(ans, Bytes)
-			}
-			if config.CharCountNeeded {
-				ans = append(ans, CC)
-			}
-			break
-		}
-	}
-	fmt.Println(ans)
-	for _, a := range ans {
-		fmt.Printf("%d ", a)
-	}
-	fmt.Printf("%s", filePath)
+	return filePath
 }
-
 func calculate() {}
