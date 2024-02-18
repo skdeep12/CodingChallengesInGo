@@ -66,8 +66,8 @@ func main() {
 			if resolvedUrl, err := t.Resolve(r.Context(), shortUrl); err != nil {
 				http.Error(w, err.Error(), http.StatusNotFound)
 			} else {
-				w.WriteHeader(http.StatusMovedPermanently)
-				w.Write([]byte(resolvedUrl))
+				w.Header().Set("Location", resolvedUrl)
+				w.WriteHeader(http.StatusFound)
 			}
 		} else {
 			http.NotFound(w, r)

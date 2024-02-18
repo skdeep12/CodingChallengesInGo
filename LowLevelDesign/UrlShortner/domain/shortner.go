@@ -45,17 +45,37 @@ func NewTestShortener(store KeyValueRepository) ShortenerResolver {
 	return &testShortener{store: store}
 }
 
+type depth struct{}
+
 func (t *testShortener) Shorten(ctx context.Context, url string) (string, UrlShortner.Error) {
+	hash := t.getHash(ctx, url)
+	d := ctx.Value(depth{})
+	if d != nil && d.(int) > 4 {
+		return "", UrlShortner.NewError(EHashConflictResolutionDepthExceeded, fmt.Sprintf("depth is %d", d.(int)))
+	}
+	if err := t.store.Set(ctx, hash, url); err != nil {
+		if err.Code() == EHashConflict {
+			if d == nil {
+				ctx = context.WithValue(ctx, depth{}, 1)
+			} else {
+				ctx = context.WithValue(ctx, depth{}, d.(int)+1)
+			}
+			hash, err = t.Shorten(ctx, url+time.Now().String())
+			if err != nil {
+				return "", err
+			}
+		} else {
+			return "", err
+		}
+	}
+	return hash, nil
+}
+
+func (t *testShortener) getHash(ctx context.Context, url string) string {
 	h := sha256.New()
 	h.Write([]byte(url))
 	bs := h.Sum(nil)
-	fmt.Println(bs)
-	encodedString := base64.StdEncoding.EncodeToString(bs)[:6]
-	if err := t.store.Set(ctx, encodedString, url); err != nil {
-		fmt.Println(err)
-		return "", err
-	}
-	return encodedString, nil
+	return base64.StdEncoding.EncodeToString(bs)[:6]
 }
 
 func (t *testShortener) Resolve(ctx context.Context, shortUrl string) (string, UrlShortner.Error) {
