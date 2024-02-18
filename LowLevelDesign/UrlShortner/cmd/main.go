@@ -22,7 +22,9 @@ type UrlShortenerResponseSchema struct {
 }
 
 func main() {
-	t := domain.NewTestShortener(repository.NewInMemoryStore())
+	s := repository.NewInMemoryStore()
+	t := domain.NewTestShortener(s)
+	l := domain.NewUrlLifeCycleHandler(s)
 	http.HandleFunc("/shorten", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusBadRequest)
@@ -53,25 +55,43 @@ func main() {
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("resolver")
-		re := regexp.MustCompile(`/.*`)
-		matches := re.FindStringSubmatch(r.URL.Path)
-		if r.Method != http.MethodGet {
+		shortUrl := GetUrlPathForResolver(r)
+		switch r.Method {
+		case http.MethodGet:
+			if len(shortUrl) > 0 {
+				if resolvedUrl, err := t.Resolve(r.Context(), shortUrl); err != nil {
+					http.Error(w, err.Error(), http.StatusNotFound)
+				} else {
+					w.Header().Set("Location", resolvedUrl)
+					w.WriteHeader(http.StatusFound)
+				}
+			} else {
+				http.NotFound(w, r)
+			}
+		case http.MethodDelete:
+			if len(shortUrl) > 0 {
+				if err := l.Delete(r.Context(), shortUrl); err != nil {
+					http.Error(w, err.Error(), http.StatusNotFound)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
+			} else {
+				http.NotFound(w, r)
+			}
+		default:
 			w.WriteHeader(http.StatusBadRequest)
 			return
-		}
-		fmt.Println(matches)
-		if len(matches) >= 1 && len(matches[0]) == 7 {
-			shortUrl := matches[0][1:]
-			fmt.Println(shortUrl)
-			if resolvedUrl, err := t.Resolve(r.Context(), shortUrl); err != nil {
-				http.Error(w, err.Error(), http.StatusNotFound)
-			} else {
-				w.Header().Set("Location", resolvedUrl)
-				w.WriteHeader(http.StatusFound)
-			}
-		} else {
-			http.NotFound(w, r)
+
 		}
 	})
 	http.ListenAndServe(":9999", nil)
+}
+
+func GetUrlPathForResolver(r *http.Request) string {
+	re := regexp.MustCompile(`/.*`)
+	matches := re.FindStringSubmatch(r.URL.Path)
+	if len(matches) >= 1 && len(matches[0]) == 7 {
+		return matches[0][1:]
+	}
+	return ""
 }

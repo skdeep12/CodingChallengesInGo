@@ -37,5 +37,10 @@ func (r *inMemoryKVRepository) Get(ctx context.Context, key string) (*domain.Url
 	}
 }
 func (r *inMemoryKVRepository) Delete(ctx context.Context, key string) UrlShortner.Error {
+	if _, ok := r.m[key]; !ok {
+		return UrlShortner.NewError(domain.ENotFound, fmt.Sprintf("%s does not exist in the store", key))
+	} else {
+		delete(r.m, key)
+	}
 	return nil
 }
