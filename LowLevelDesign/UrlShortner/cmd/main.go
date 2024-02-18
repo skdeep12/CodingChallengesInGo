@@ -12,7 +12,13 @@ import (
 )
 
 type UrlShortenerRequestSchema struct {
-	Url string
+	Url string `json:"url"`
+}
+
+type UrlShortenerResponseSchema struct {
+	Key      string `json:"key"`
+	LongUrl  string `json:"long_url"`
+	ShortUrl string `json:"short_url"`
 }
 
 func main() {
@@ -34,7 +40,14 @@ func main() {
 		} else if short, uErr := t.Shorten(context.Background(), requestSchema.Url); err != nil {
 			http.Error(w, uErr.Error(), http.StatusExpectationFailed)
 		} else {
-			w.Write([]byte(fmt.Sprintf("http://localhost:9999/%s", short)))
+			response := UrlShortenerResponseSchema{
+				Key:      short,
+				ShortUrl: fmt.Sprintf("http://localhost:9999/%s", short),
+				LongUrl:  requestSchema.Url,
+			}
+			responseBytes, _ := json.Marshal(response)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(responseBytes)
 		}
 	})
 
